@@ -15,6 +15,7 @@ from kotlin_qa.suppression import (
     gradle_sites,
     kotlin_sites,
     project_files,
+    script_sites,
     suppression_findings,
     xml_sites,
 )
@@ -261,3 +262,82 @@ def test_the_project_scan_holds_a_whole_project_to_the_record(tmp_path: Path) ->
     ]
     only = suppression_findings(config, [], ("app",))
     assert [f.path for f in only] == ["app/A.kt"]
+
+
+def test_gradle_settings_that_loosen_detekt_or_the_compiler_are_found() -> None:
+    source = (
+        "kotlin {\n  compilerOptions {\n    allWarningsAsErrors = false\n  }\n}\n"
+        'detekt {\n  ignoreFailures = true\n  baseline = file("detekt-baseline.xml")\n}\n'
+    )
+    found = [(s.line, s.tool, s.codes) for s in gradle_sites("app/build.gradle.kts", source)]
+    assert (3, "kotlin", ("allWarningsAsErrors",)) in found
+    assert (7, "detekt", ("ignoreFailures",)) in found
+    assert any(line == 8 and tool in {"lint", "detekt"} for line, tool, _ in found)
+
+
+def test_a_detekt_baseline_file_is_a_suppression_route() -> None:
+    found = xml_sites("app/detekt-baseline.xml", "<SmellBaseline/>")
+    assert [(s.tool, s.codes) for s in found] == [("detekt", ("baseline",))]
+
+
+def test_a_suppress_naming_a_detekt_rule_is_routed_to_detekt() -> None:
+    source = '@Suppress("detekt:MagicNumber", "detekt.LongMethod", "UNUSED")\nfun f() {}\n'
+    found = {(s.tool, s.codes) for s in kotlin_sites("A.kt", source)}
+    assert found == {("detekt", ("MagicNumber", "LongMethod")), ("kotlin", ("UNUSED",))}
+
+
+def script_found(name: str, source: str) -> list[tuple[int, str, tuple[str, ...]]]:
+    return [(s.line, s.tool, s.codes) for s in script_sites(name, source)]
+
+
+def test_shellcheck_directives_name_the_codes_they_silence() -> None:
+    source = "#!/bin/sh\n# shellcheck disable=SC2086,SC2046\necho $x\n"
+    assert script_found("ci/run.sh", source) == [(2, "shellcheck", ("SC2086", "SC2046"))]
+
+
+def test_a_shellcheck_disable_all_is_blanket() -> None:
+    assert script_found("run.sh", "# shellcheck disable=all\n") == [(1, "shellcheck", ())]
+
+
+def test_other_shellcheck_directives_are_not_suppressions() -> None:
+    assert script_found("run.sh", "# shellcheck source=lib.sh\n# shellcheck shell=bash\n") == []
+
+
+def test_a_gitleaks_allow_comment_is_a_suppression_in_any_scanned_file() -> None:
+    assert script_found("ci/run.sh", 'KEY="x" # gitleaks:allow\n') == [(1, "gitleaks", ("allow",))]
+    assert script_found("app/Config.kt", 'val k = "x" // gitleaks:allow\n') == [
+        (1, "gitleaks", ("allow",))
+    ]
+
+
+def test_a_zizmor_ignore_names_the_audit_or_is_blanket() -> None:
+    source = (
+        "jobs:\n  a:\n    steps:\n"
+        "      - run: echo ${{ x }} # zizmor: ignore[template-injection]\n"
+        "      - run: echo ${{ y }} # zizmor: ignore\n"
+    )
+    assert script_found(".github/workflows/ci.yml", source) == [
+        (4, "zizmor", ("template-injection",)),
+        (5, "zizmor", ()),
+    ]
+
+
+def test_every_line_of_a_gitleaks_ignore_file_is_a_suppression() -> None:
+    source = "# comment\n\nabc123:file.txt:aws-key:4\ndef456:other.txt:key:9\n"
+    assert script_found(".gitleaksignore", source) == [
+        (3, "gitleaks", ("ignorefile",)),
+        (4, "gitleaks", ("ignorefile",)),
+    ]
+
+
+def test_an_actionlint_or_zizmor_config_that_ignores_findings_is_a_suppression() -> None:
+    assert script_found(".github/actionlint.yaml", "ignore:\n  - 'shellcheck reported'\n") == [
+        (1, "actionlint", ("ignore",))
+    ]
+    assert script_found(".github/zizmor.yml", "rules:\n  x:\n    ignore:\n      - ci.yml\n") == [
+        (3, "zizmor", ("config-ignore",))
+    ]
+
+
+def test_workflows_with_no_suppressions_have_none() -> None:
+    assert script_found(".github/workflows/ci.yml", "name: ci\non: push\n") == []

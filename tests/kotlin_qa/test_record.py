@@ -159,3 +159,17 @@ def test_findings_point_at_the_line_of_their_exception(tmp_path: Path) -> None:
     ]
     expired = check_record(entries, RecordPolicy(), "qa/record.toml", TODAY)
     assert [finding.render().split(": ")[0] for finding in expired] == ["qa/record.toml:19"]
+
+
+def test_a_scan_exclude_glob_can_be_recorded(tmp_path: Path) -> None:
+    text = entry_text(rule='"kqa::scan_exclude:.claude/**"', path='"qa/kotlin-qa.toml"')
+    entries, findings = load(tmp_path, text)
+    assert findings == []
+    assert [entry.rule for entry in entries] == ["kqa::scan_exclude:.claude/**"]
+
+
+def test_a_rule_naming_something_else_is_still_rejected(tmp_path: Path) -> None:
+    text = entry_text(rule='"kqa::scan_exclude: x y"', path='"qa/kotlin-qa.toml"')
+    entries, findings = load(tmp_path, text)
+    assert entries == []
+    assert findings

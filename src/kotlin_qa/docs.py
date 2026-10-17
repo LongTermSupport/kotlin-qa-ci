@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 BUNDLED_DOCS = Path(__file__).parent / "docs"
 DANGLING = "kqaci.docs.dangling"
 REQUIRED_SECTIONS = ("## What it flags", "## Why", "## How to fix correctly")
-_PREFIX = re.compile(r"^(?:ktlint|semgrep|lint|kotlin|idea|kqa)::")
+_PREFIX = re.compile(
+    r"^(?:ktlint|semgrep|lint|kotlin|idea|kqa|detekt|shellcheck|gitleaks|zizmor|actionlint)::"
+)
 # Tools whose rules kotlin-qa runs or routes but whose catalogues it does not bundle.
 _TOOLS = {
     "ktlint": "ktlint",
@@ -23,6 +25,11 @@ _TOOLS = {
     "kotlin": "the Kotlin compiler",
     "idea": "the IntelliJ inspections",
     "semgrep": "Semgrep",
+    "detekt": "Detekt",
+    "shellcheck": "ShellCheck",
+    "gitleaks": "gitleaks",
+    "zizmor": "zizmor",
+    "actionlint": "actionlint",
     "kqa": "kotlin-qa's own configuration",
 }
 

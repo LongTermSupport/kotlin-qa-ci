@@ -48,9 +48,21 @@ BUILTIN = {
         "semgrep",
         "Semgrep reads every source file completely, so no rule is skipped silently.",
     ),
+    "kqaci.shell": ("shell", "Shell scripts pass ShellCheck."),
+    "kqaci.workflows": (
+        "workflows",
+        "GitHub Actions workflows pass actionlint and zizmor.",
+    ),
+    "kqaci.leaks": ("leaks", "No commit in the history contains a credential."),
+    "kqaci.detekt": ("detekt", "Detekt reports no issue, with the shipped strict configuration."),
+    "kqaci.detekt.unjustified": (
+        "detekt",
+        "Every loosening of the shipped Detekt configuration says why.",
+    ),
     "kqaci.lint": ("lint", "Android Lint reports no issue."),
     "kqaci.tests": ("test", "The unit test suite passes."),
-    "kqaci.build": ("build", "The app builds."),
+    "kqaci.coverage.below": ("coverage", "Line coverage is at or above the project's minimum."),
+    "kqaci.build": ("build", "The app builds, with every compiler warning an error."),
 }
 
 

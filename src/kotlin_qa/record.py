@@ -18,8 +18,20 @@ BUDGET = "kqaci.record.budget"
 EXPIRED = "kqaci.record.expired"
 STALE = "kqaci.record.stale"
 
-TOOL_PREFIXES = ("ktlint", "semgrep", "lint", "kotlin", "idea", "kqa")
-_RULE = re.compile(r"^(?:" + "|".join(TOOL_PREFIXES) + r")::[A-Za-z0-9_.:\-]+$")
+TOOL_PREFIXES = (
+    "ktlint",
+    "semgrep",
+    "lint",
+    "kotlin",
+    "idea",
+    "kqa",
+    "detekt",
+    "shellcheck",
+    "gitleaks",
+    "zizmor",
+    "actionlint",
+)
+_RULE = re.compile(r"^(?:" + "|".join(TOOL_PREFIXES) + r")::[A-Za-z0-9_.:/*\-]+$")
 _FIELDS = ("rule", "path", "justification", "decided_by", "decided_on", "review_by")
 _OPTIONAL_FIELDS = ("covers",)
 COVERS = ("site", "findings")

@@ -19,10 +19,21 @@ format and identifier scheme.
 | `docs`        | Every listed identifier resolves to a complete documentation page          | kotlin-qa             |
 | `rules`       | Every custom rule is named, has a fixture, and flags exactly its red lines | kotlin-qa and Semgrep |
 | `semgrep`     | Runs the bundled and project rules over the project                        | Semgrep (pinned)      |
+| `shell`       | Tracked `.sh` and `.bash` scripts                                          | ShellCheck (pinned)   |
+| `workflows`   | GitHub Actions workflows: mistakes, then insecure patterns                 | actionlint, zizmor    |
+| `leaks`       | Credentials anywhere in the commit history                                 | gitleaks (pinned)     |
+| `detekt`      | Static analysis with type information, strict shipped configuration        | Detekt (pinned)       |
 | _checks_      | Any command the project registers as a detector or runner                  | the project's own     |
 | `lint`        | Android Lint (a detector, last because it compiles)                        | Gradle                |
-| `test`        | Unit tests                                                                 | Gradle                |
-| `build`       | The app builds                                                             | Gradle                |
+| `test`        | Unit tests, with every Kotlin compiler warning an error                    | Gradle                |
+| `coverage`    | Line coverage held to the project's minimum                                | Gradle and JaCoCo     |
+| `build`       | The app builds, with every Kotlin compiler warning an error                | Gradle                |
+
+The library owns the tools, their versions and their default configuration, as `php-qa-ci` does
+for PHP. The Gradle lanes load an init script shipped here, so Detekt, coverage and
+warnings-as-errors need no change to the project's build files. A project overrides the shipped
+Detekt configuration in `qa/detekt.yml`, and each override needs its reason written on the line
+above it.
 
 Every failing line prints a stable identifier. `kotlin-qa rule-doc <identifier>` prints its
 documentation offline, including a "How to fix correctly" section.
@@ -30,11 +41,16 @@ documentation offline, including a "How to fix correctly" section.
 ## Install
 
 ```bash
-pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.1
+pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.2.0
+kotlin-qa install-tools           # ktlint, ShellCheck, actionlint, zizmor, gitleaks, checksum-pinned
 kotlin-qa tools                   # every lane and what runs it
 ```
 
-ktlint must be on `PATH`, or named in `KTLINT`. The project needs a Gradle wrapper. See
+Each tool is found from its environment variable (`KTLINT`, `SHELLCHECK`, `ACTIONLINT`, `ZIZMOR`,
+`GITLEAKS`), else the copy `install-tools` put in `~/.cache/kotlin-qa` (or `$KOTLIN_QA_HOME`),
+else the search path. `install-tools` refuses a download whose SHA-256 differs from the pin.
+Pinned builds exist for Linux x86_64 and aarch64; elsewhere install the tool yourself. The
+project needs a Gradle wrapper and Java. See
 [docs/adopting.md](docs/adopting.md) for adding it to a project and to CI.
 
 ## Commands
@@ -48,6 +64,7 @@ kotlin-qa docs-check           fail if a listed identifier has no documentation
 kotlin-qa record check|list    validate or list the exceptions
 kotlin-qa summary [--check]    write or check the agent summary region
 kotlin-qa tools                every lane, whether it is on, and its tool
+kotlin-qa install-tools [NAME] download the pinned tools into the cache
 ```
 
 `kotlin-qa rule` is the red-before-green harness: run a new rule on its fixture and it exits 1,

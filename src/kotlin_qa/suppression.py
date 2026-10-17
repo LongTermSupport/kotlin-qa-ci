@@ -30,7 +30,7 @@ UNSCANNED = "kqaci.suppression.unscanned"
 SKIPPED_DIRECTORIES = frozenset(
     {".git", ".gradle", ".idea", ".kotlin", ".venv", "build", "node_modules", "__pycache__"}
 )
-SCANNED_SUFFIXES = (".kt", ".kts", ".java", ".xml", ".gradle")
+SCANNED_SUFFIXES = (".kt", ".kts", ".java", ".xml", ".gradle", ".sh", ".bash", ".yml", ".yaml")
 EDITORCONFIG = ".editorconfig"
 
 
@@ -189,6 +189,7 @@ _KTLINT = re.compile(r"^\s*ktlint[-:]disable(?:-next-line|-line)?\b(.*)", re.DOT
 _NOINSPECTION = re.compile(r"^\s*noinspection\b(.*)", re.DOTALL)
 _NOSEM = re.compile(r"^\s*nosem(?:grep)?\b(?:\s*:\s*(.*))?", re.DOTALL)
 _WORDS = re.compile(r"[^\s,]+")
+_DETEKT_PREFIX = re.compile(r"^detekt[:.]")
 
 
 def _words(text: str | None) -> tuple[str, ...]:
@@ -241,12 +242,15 @@ def _annotation_to_sites(display: str, line: int, name: str, names: list[str]) -
     if not names:
         return [Site(display, line, "kotlin", ())]
     ktlint = tuple(n.removeprefix("ktlint:") for n in names if n.startswith("ktlint:"))
-    others = tuple(n for n in names if not n.startswith("ktlint:"))
+    detekt = tuple(_DETEKT_PREFIX.sub("", n) for n in names if _DETEKT_PREFIX.match(n))
+    others = tuple(n for n in names if not n.startswith("ktlint:") and not _DETEKT_PREFIX.match(n))
     sites = []
     if others:
         sites.append(Site(display, line, "kotlin", others))
     if ktlint:
         sites.append(Site(display, line, "ktlint", ktlint))
+    if detekt:
+        sites.append(Site(display, line, "detekt", detekt))
     return sites
 
 
@@ -285,6 +289,8 @@ def xml_sites(display: str, source: str) -> list[Site]:
     name = PurePosixPath(display).name
     if name.startswith("lint-baseline") and name.endswith(".xml"):
         found.append(Site(display, 1, "lint", ("baseline",)))
+    if name.startswith("detekt-baseline") and name.endswith(".xml"):
+        found.append(Site(display, 1, "detekt", ("baseline",)))
     text = _XML_COMMENT.sub(lambda m: _blank(m.group(0)), source)
     for match in _TOOLS_ATTR.finditer(text):
         codes = _words(match.group(1))
@@ -308,6 +314,12 @@ _GRADLE_FLAGS = (
     (re.compile(r"\bignoreWarnings\s*=\s*true\b"), "lint", "ignoreWarnings"),
     (re.compile(r"\bcheckReleaseBuilds\s*=\s*false\b"), "lint", "checkReleaseBuilds"),
     (re.compile(r"\bsuppressWarnings\s*=\s*true\b"), "kotlin", "suppressWarnings"),
+    (
+        re.compile(r"\ballWarningsAsErrors\s*(?:=|\.set\()\s*false\b"),
+        "kotlin",
+        "allWarningsAsErrors",
+    ),
+    (re.compile(r"\bignoreFailures\s*(?:=|\.set\()\s*true\b"), "detekt", "ignoreFailures"),
 )
 _GRADLE_DISABLE = re.compile(r"\bdisable(?:\s*\+=|\.add\(|\.addAll\(|\()\s*(.*)")
 
@@ -346,6 +358,49 @@ def editorconfig_sites(display: str, source: str) -> list[Site]:
     return found
 
 
+# --- shell scripts, workflows and the ignore files of the repository tools --------------------
+
+_SHELLCHECK = re.compile(r"#\s*shellcheck\s+(?:[\w=-]+\s+)*?disable=([\w,-]+)")
+_GITLEAKS_ALLOW = re.compile(r"gitleaks:allow\b")
+_ZIZMOR = re.compile(r"#\s*zizmor:\s*ignore(?:\[([^\]]*)\])?")
+_YAML_IGNORE = re.compile(r"^\s*ignore\s*:")
+_IGNORE_FILE = ".gitleaksignore"
+
+
+def script_sites(display: str, source: str) -> list[Site]:
+    """Return suppressions in shell scripts, workflows and the repository tools' ignore files."""
+    base = PurePosixPath(display).name
+    found: list[Site] = []
+    lines = source.splitlines()
+    if base == _IGNORE_FILE:
+        return [
+            Site(display, number, "gitleaks", ("ignorefile",))
+            for number, line in enumerate(lines, start=1)
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    config_tools = {"actionlint.yaml": "actionlint", "actionlint.yml": "actionlint"}
+    config_tools |= {"zizmor.yaml": "zizmor", "zizmor.yml": "zizmor"}
+    for number, line in enumerate(lines, start=1):
+        if base in config_tools and _YAML_IGNORE.match(line):
+            tool = config_tools[base]
+            found.append(
+                Site(
+                    display, number, tool, ("ignore" if tool == "actionlint" else "config-ignore",)
+                )
+            )
+            continue
+        if match := _SHELLCHECK.search(line):
+            codes = _words(match.group(1).replace(",", " "))
+            blanket = any(code.lower() == "all" for code in codes)
+            found.append(Site(display, number, "shellcheck", () if blanket else codes))
+        if _GITLEAKS_ALLOW.search(line):
+            found.append(Site(display, number, "gitleaks", ("allow",)))
+        if match := _ZIZMOR.search(line):
+            codes = _words((match.group(1) or "").replace(",", " "))
+            found.append(Site(display, number, "zizmor", codes))
+    return found
+
+
 def file_sites(root: Path, name: str) -> list[Site] | Finding:
     """Return the suppression sites in one project file, or a finding if it cannot be read."""
     try:
@@ -355,13 +410,14 @@ def file_sites(root: Path, name: str) -> list[Site] | Finding:
     base = PurePosixPath(name).name
     if base == EDITORCONFIG:
         return editorconfig_sites(name, source)
+    allowed = [site for site in script_sites(name, source) if site.tool == "gitleaks"]
     if base.endswith((".gradle.kts", ".gradle")):
-        return gradle_sites(name, source)
+        return sorted(gradle_sites(name, source) + allowed, key=lambda site: site.line)
     if base.endswith((".kt", ".kts", ".java")):
-        return kotlin_sites(name, source)
+        return sorted(kotlin_sites(name, source) + allowed, key=lambda site: site.line)
     if base.endswith(".xml"):
-        return xml_sites(name, source)
-    return []
+        return sorted(xml_sites(name, source) + allowed, key=lambda site: site.line)
+    return script_sites(name, source)
 
 
 def config_sites(root: Path) -> list[Site]:
@@ -402,7 +458,7 @@ def within(name: str, path: str) -> bool:
 
 def _scanned(name: str) -> bool:
     base = PurePosixPath(name).name
-    return base == EDITORCONFIG or base.endswith(SCANNED_SUFFIXES)
+    return base in {EDITORCONFIG, _IGNORE_FILE} or base.endswith(SCANNED_SUFFIXES)
 
 
 def _git_files(root: Path) -> list[str] | None:

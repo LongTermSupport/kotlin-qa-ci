@@ -16,7 +16,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from kotlin_qa import __version__
+from kotlin_qa.coverage import check_coverage
 from kotlin_qa.defences import Defence, active_defences
+from kotlin_qa.detekt_config import check_overrides
 from kotlin_qa.docs import check_docs
 from kotlin_qa.finding import Finding
 from kotlin_qa.record import RecordEntry, check_record, load_record
@@ -24,7 +26,13 @@ from kotlin_qa.rules import load_rules
 from kotlin_qa.semgrep_run import prove_rules, scan_project
 from kotlin_qa.summary import check_summary
 from kotlin_qa.suppression import suppression_findings
-from kotlin_qa.tools import ToolMissingError, gradle_command, ktlint_command, ktlint_targets
+from kotlin_qa.tools import (
+    ToolMissingError,
+    external_commands,
+    gradle_command,
+    ktlint_command,
+    ktlint_targets,
+)
 
 if TYPE_CHECKING:
     from datetime import date
@@ -41,13 +49,32 @@ METHOD_LINE = (
 )
 PHASES = (
     ("format", ("fmt",)),
-    ("detectors", ("record", "suppression", "summary", "docs", "rules", "semgrep", "lint")),
-    ("runners", ("test", "build")),
+    (
+        "detectors",
+        (
+            "record",
+            "suppression",
+            "summary",
+            "docs",
+            "rules",
+            "semgrep",
+            "shell",
+            "workflows",
+            "leaks",
+            "detekt",
+            "lint",
+        ),
+    ),
+    ("runners", ("test", "coverage", "build")),
 )
 BUILTIN_LANES = frozenset({"record", "suppression", "summary", "docs", "rules", "semgrep"})
 # Lanes whose tool prints no identifier of its own: kotlin-qa prints one for each failing step.
 _LANE_IDENTIFIERS = {
     "fmt": "kqaci.format",
+    "shell": "kqaci.shell",
+    "workflows": "kqaci.workflows",
+    "leaks": "kqaci.leaks",
+    "detekt": "kqaci.detekt",
     "lint": "kqaci.lint",
     "test": "kqaci.tests",
     "build": "kqaci.build",
@@ -76,7 +103,7 @@ def lane_phases(config: Config) -> tuple[tuple[str, tuple[str, ...]], ...]:
     return (
         PHASES[0],
         ("detectors", (*detector_lanes[:-1], *detectors, detector_lanes[-1])),
-        ("runners", ("test", *runners, "build")),
+        ("runners", ("test", "coverage", *runners, "build")),
     )
 
 
@@ -222,6 +249,16 @@ def _run_lane(state: _Run, lane: str) -> tuple[str, str]:
     check = next((check for check in config.checks if check.name == lane), None)
     if check is not None:
         return _project_check(state, check)
+    if lane == "coverage":
+        return _coverage(state)
+    if lane == "detekt" and (overrides := check_overrides(config)):
+        _report(overrides, state.out)
+        return "FAIL", "unjustified override"
+    return _external_lane(state, lane)
+
+
+def _external_lane(state: _Run, lane: str) -> tuple[str, str]:
+    """Run the tool behind a lane: ktlint or Gradle."""
     try:
         steps = _steps(state, lane)
     except ToolMissingError as error:
@@ -239,11 +276,31 @@ def _run_lane(state: _Run, lane: str) -> tuple[str, str]:
     return "PASS", ""
 
 
+def _coverage(state: _Run) -> tuple[str, str]:
+    """Run the coverage task, then hold the report's line coverage to the project's minimum."""
+    config = state.config
+    if state.step(gradle_command(config, "coverage")) != 0:
+        state.out.write(
+            f"kotlin-qa: coverage failed: {_LANE_IDENTIFIERS['test']} "
+            f"(kotlin-qa rule-doc {_LANE_IDENTIFIERS['test']})\n"
+        )
+        return "FAIL", "tests failed"
+    figure, findings = check_coverage(config)
+    if figure is not None:
+        state.out.write(
+            f"kotlin-qa: line coverage {figure:.1f}% (minimum {config.coverage_minimum:g}%)\n"
+        )
+    state.out.writelines(finding.render() + "\n" for finding in sorted(findings))
+    return ("FAIL" if findings else "PASS"), ""
+
+
 def _steps(state: _Run, lane: str) -> list[list[str]]:
     config = state.config
     if lane == "fmt":
         files = ktlint_targets(config, state.paths)
         return [ktlint_command(config, files, no_fix=state.no_fix)] if files else []
+    if lane in {"shell", "workflows", "leaks"}:
+        return external_commands(config, lane, state.paths)
     return [gradle_command(config, lane)]
 
 

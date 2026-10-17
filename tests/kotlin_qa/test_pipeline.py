@@ -12,7 +12,7 @@ from kotlin_qa.pipeline import UsageError, all_lanes, run_pipeline
 
 TODAY = date(2026, 3, 1)
 QUIET = ""
-SLOW = ("rules", "semgrep", "lint")
+SLOW = ("rules", "semgrep", "shell", "workflows", "leaks", "detekt", "lint", "coverage")
 STATUSES = {"PASS", "off", "skip"}
 
 
@@ -159,3 +159,99 @@ def test_the_json_report_records_every_lane(tmp_path: Path) -> None:
 def test_the_closing_failure_message_points_at_the_method(tmp_path: Path) -> None:
     _, out = run(project(tmp_path), Recorder("ktlint"))
     assert "https://defence-before-fix.github.io/" in out
+
+
+def lanes_run(tmp_path: Path, toml: str, runner: Recorder, *skip: str) -> tuple[int, str]:
+    root = project(tmp_path, toml)
+    return run(root, runner, skipped=tuple(lane for lane in SLOW if lane not in skip))
+
+
+def test_detekt_runs_after_semgrep_and_before_lint_and_coverage_after_the_tests(
+    tmp_path: Path,
+) -> None:
+    lanes = list(all_lanes(load_config(project(tmp_path))))
+    assert lanes.index("semgrep") < lanes.index("detekt") < lanes.index("lint")
+    assert lanes.index("test") < lanes.index("coverage") < lanes.index("build")
+
+
+def test_the_detekt_lane_runs_gradle_with_the_detekt_tasks(tmp_path: Path) -> None:
+    runner = Recorder()
+    code, _ = lanes_run(tmp_path, QUIET, runner, "detekt")
+    assert code == 0
+    assert runner.commands[1][-2:] == ["detektDebug", "detektDebugUnitTest"]
+
+
+def test_a_detekt_failure_is_reported_with_its_identifier(tmp_path: Path) -> None:
+    code, out = lanes_run(tmp_path, QUIET, Recorder("detektDebug"), "detekt")
+    assert code == 1
+    assert "kqaci.detekt " in out
+    assert "kotlin-qa rule-doc kqaci.detekt" in out
+
+
+def test_an_unjustified_detekt_override_fails_before_gradle_starts(tmp_path: Path) -> None:
+    root = project(tmp_path)
+    (root / "qa" / "detekt.yml").write_text("style:\n  MagicNumber:\n    active: false\n", "utf-8")
+    runner = Recorder()
+    code, out = run(root, runner, skipped=tuple(lane for lane in SLOW if lane != "detekt"))
+    assert code == 1
+    assert "qa/detekt.yml:2: kqaci.detekt.unjustified" in out
+    assert not any("detektDebug" in command for command in runner.commands)
+
+
+def write_report(root: Path, missed: int, covered: int) -> None:
+    report = root / "app/build/reports/coverage/test/debug/report.xml"
+    report.parent.mkdir(parents=True)
+    report.write_text(
+        f'<report><counter type="LINE" missed="{missed}" covered="{covered}"/></report>'
+    )
+
+
+def test_the_coverage_lane_prints_the_figure_and_passes_at_the_minimum(tmp_path: Path) -> None:
+    root = project(tmp_path, "[coverage]\nminimum_line = 40\n")
+    write_report(root, missed=50, covered=50)
+    code, out = run(root, Recorder(), skipped=tuple(lane for lane in SLOW if lane != "coverage"))
+    assert code == 0
+    assert "line coverage 50.0% (minimum 40%)" in out
+
+
+def test_coverage_below_the_minimum_fails_the_run(tmp_path: Path) -> None:
+    root = project(tmp_path, "[coverage]\nminimum_line = 60\n")
+    write_report(root, missed=50, covered=50)
+    code, out = run(root, Recorder(), skipped=tuple(lane for lane in SLOW if lane != "coverage"))
+    assert code == 1
+    assert "kqaci.coverage.below" in out
+
+
+def test_a_failing_coverage_task_is_a_test_failure_not_a_coverage_finding(tmp_path: Path) -> None:
+    root = project(tmp_path)
+    code, out = run(
+        root,
+        Recorder("createDebugUnitTestCoverageReport"),
+        skipped=tuple(lane for lane in SLOW if lane != "coverage"),
+    )
+    assert code == 1
+    assert "kqaci.tests" in out
+    assert "kqaci.coverage.below" not in out
+
+
+def test_the_new_detectors_run_between_semgrep_and_detekt(tmp_path: Path) -> None:
+    lanes = list(all_lanes(load_config(project(tmp_path))))
+    assert lanes.index("semgrep") < lanes.index("shell") < lanes.index("workflows")
+    assert lanes.index("workflows") < lanes.index("leaks") < lanes.index("detekt")
+
+
+def test_a_failing_leak_scan_fails_with_its_identifier(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("GITLEAKS", "gitleaks")
+    skipped = tuple(lane for lane in SLOW if lane != "leaks")
+    code, out = run(project(tmp_path), Recorder("gitleaks"), skipped=skipped)
+    assert code == 1
+    assert "kqaci.leaks" in out
+
+
+def test_a_lane_with_no_files_passes_saying_so(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SHELLCHECK", "shellcheck")
+    skipped = tuple(lane for lane in SLOW if lane != "shell")
+    runner = Recorder()
+    code, out = run(project(tmp_path), runner, skipped=skipped)
+    assert code == 0
+    assert "nothing to check" in out

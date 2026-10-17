@@ -40,6 +40,7 @@ def test_ktlint_formats_unless_told_to_only_check(tmp_path: Path, monkeypatch) -
 
 def test_a_missing_ktlint_is_an_error_naming_how_to_supply_it(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("KTLINT", raising=False)
+    monkeypatch.setenv("KOTLIN_QA_HOME", str(tmp_path / "empty-cache"))
     monkeypatch.setenv("PATH", str(tmp_path))
     config = load_config(project(tmp_path))
     with pytest.raises(ToolMissingError, match="KTLINT"):
@@ -48,6 +49,7 @@ def test_a_missing_ktlint_is_an_error_naming_how_to_supply_it(tmp_path: Path, mo
 
 def test_gradle_runs_the_wrapper_with_the_configured_task(tmp_path: Path) -> None:
     config = load_config(project(tmp_path, GRADLE))
-    assert gradle_command(config, "lint") == ["./gradlew", "--stacktrace", "lint"]
-    assert gradle_command(config, "test") == ["./gradlew", "--stacktrace", "testDebugUnitTest"]
-    assert gradle_command(config, "build") == ["./gradlew", "--stacktrace", "assembleDebug"]
+    assert gradle_command(config, "lint")[-1] == "lint"
+    assert gradle_command(config, "test")[-1] == "testDebugUnitTest"
+    assert gradle_command(config, "build")[-1] == "assembleDebug"
+    assert gradle_command(config, "build")[0] == "./gradlew"

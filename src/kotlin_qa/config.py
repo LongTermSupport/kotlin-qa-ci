@@ -20,8 +20,13 @@ TOOLS = (
     "docs",
     "rules",
     "semgrep",
+    "shell",
+    "workflows",
+    "leaks",
+    "detekt",
     "lint",
     "test",
+    "coverage",
     "build",
 )
 CHECK_PHASES = ("detectors", "runners")
@@ -37,10 +42,22 @@ _TOP_KEYS = frozenset(
         "gradle",
         "lock",
         "check",
+        "detekt",
+        "coverage",
     }
 )
 _RECORD_KEYS = frozenset({"path", "max_total", "max_per_rule", "max_review_days"})
-_GRADLE_KEYS = frozenset({"wrapper", "test_task", "lint_task", "build_task"})
+_GRADLE_KEYS = frozenset(
+    {
+        "wrapper",
+        "test_task",
+        "lint_task",
+        "build_task",
+        "detekt_tasks",
+        "coverage_task",
+        "coverage_report",
+    }
+)
 _CHECK_KEYS = frozenset({"name", "command", "description", "doc", "phase", "files"})
 _CHECK_NAME = re.compile(r"[a-z][a-z0-9_-]*\Z")
 
@@ -67,6 +84,9 @@ class GradleConfig:
     test_task: str = "testDebugUnitTest"
     lint_task: str = "lintDebug"
     build_task: str = "assembleDebug"
+    detekt_tasks: tuple[str, ...] = ("detektDebug", "detektDebugUnitTest")
+    coverage_task: str = "createDebugUnitTestCoverageReport"
+    coverage_report: str = "app/build/reports/coverage/test/debug/report.xml"
 
 
 @dataclass(frozen=True)
@@ -95,6 +115,8 @@ class Config:
     gradle: GradleConfig = field(default_factory=GradleConfig)
     checks: tuple[ProjectCheck, ...] = ()
     lock: bool = True
+    detekt_overrides: tuple[str, ...] = ("qa/detekt.yml",)
+    coverage_minimum: float = 0.0
 
     @property
     def record_path(self) -> Path:
@@ -139,6 +161,8 @@ def load_config(root: Path) -> Config:
         gradle=_gradle(data.get("gradle", {})),
         checks=_checks(data.get("check", [])),
         lock=_boolean(data, "lock", default=True),
+        detekt_overrides=_detekt(data.get("detekt", {})),
+        coverage_minimum=_coverage(data.get("coverage", {})),
     )
 
 
@@ -224,12 +248,40 @@ def _gradle(value: object) -> GradleConfig:
     defaults = GradleConfig()
     settings = {}
     for key in _GRADLE_KEYS:
-        text = table.get(key, getattr(defaults, key))
-        if not isinstance(text, str) or not text.strip():
+        value = table.get(key, getattr(defaults, key))
+        if key == "detekt_tasks":
+            if (
+                not isinstance(value, (list, tuple))
+                or not value
+                or not all(isinstance(item, str) and item.strip() for item in value)
+            ):
+                msg = "gradle.detekt_tasks must be a non-empty list of strings"
+                raise ConfigError(msg)
+            settings[key] = tuple(value)
+            continue
+        if not isinstance(value, str) or not value.strip():
             msg = f"gradle.{key} must be a string"
             raise ConfigError(msg)
-        settings[key] = text
+        settings[key] = value
     return GradleConfig(**settings)
+
+
+def _detekt(value: object) -> tuple[str, ...]:
+    table = _table(value, "detekt", frozenset({"overrides"}))
+    return _strings(table, "overrides", ("qa/detekt.yml",))
+
+
+def _coverage(value: object) -> float:
+    table = _table(value, "coverage", frozenset({"minimum_line"}))
+    minimum = table.get("minimum_line", 0.0)
+    if (
+        isinstance(minimum, bool)
+        or not isinstance(minimum, (int, float))
+        or not 0 <= minimum <= 100
+    ):
+        msg = "coverage.minimum_line must be a percentage from 0 to 100"
+        raise ConfigError(msg)
+    return float(minimum)
 
 
 def _checks(value: object) -> tuple[ProjectCheck, ...]:

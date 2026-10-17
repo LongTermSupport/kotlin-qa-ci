@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from kotlin_qa import cli
 from kotlin_qa.cli import main
+from kotlin_qa.toolchain import PINNED, ChecksumError
 
 RULE = """\
 rules:
@@ -65,7 +67,9 @@ def test_tools_lists_every_lane_and_what_runs_it(root: Path, capsys) -> None:
     out = capsys.readouterr().out
     assert "fmt" in out
     assert "ktlint" in out
-    assert "./gradlew --stacktrace testDebugUnitTest" in out
+    assert "./gradlew testDebugUnitTest" in out
+    assert "Detekt" in out
+    assert "kotlin-qa.init.gradle" not in out
 
 
 def test_summary_writes_then_checks_clean(root: Path, capsys) -> None:
@@ -117,3 +121,42 @@ def test_rule_runs_the_suppression_detector_alone_on_given_paths(root: Path, cap
     (root / "app" / "Bad.kt").write_text('@Suppress("x")\nclass A\n', "utf-8")
     assert main(["rule", "kqaci.suppression.unrecorded", "app"]) == 1
     assert main(["rule", "kqaci.suppression.unrecorded", "app/Quiet.kt"]) == 0
+
+
+def test_install_tools_installs_every_pinned_tool_into_the_cache(
+    root: Path, monkeypatch, tmp_path: Path, capsys
+) -> None:
+    installed: list[str] = []
+
+    def fake(name: str, cache: Path, *args, **kwargs) -> Path:
+        installed.append(name)
+        return cache / name
+
+    monkeypatch.setattr(cli, "install_tool", fake)
+    monkeypatch.setenv("KOTLIN_QA_HOME", str(tmp_path / "cache"))
+    assert main(["install-tools"]) == 0
+    assert installed == sorted(PINNED)
+    assert str(tmp_path / "cache") in capsys.readouterr().out
+
+
+def test_install_tools_can_be_given_the_names_to_install(root: Path, monkeypatch) -> None:
+    installed: list[str] = []
+    monkeypatch.setattr(
+        cli, "install_tool", lambda name, cache, *a, **k: installed.append(name) or cache
+    )
+    assert main(["install-tools", "shellcheck", "gitleaks"]) == 0
+    assert installed == ["shellcheck", "gitleaks"]
+
+
+def test_install_tools_refuses_an_unknown_name(root: Path, capsys) -> None:
+    assert main(["install-tools", "nonsense"]) == 2
+    assert "nonsense" in capsys.readouterr().err
+
+
+def test_a_checksum_mismatch_fails_the_install_and_says_so(root: Path, monkeypatch, capsys) -> None:
+    def refuse(*args, **kwargs):
+        raise ChecksumError("gitleaks 8.30.1: downloaded abc, pinned def; not installed")
+
+    monkeypatch.setattr(cli, "install_tool", refuse)
+    assert main(["install-tools", "gitleaks"]) == 1
+    assert "not installed" in capsys.readouterr().err

@@ -21,6 +21,14 @@ from kotlin_qa.record import RecordEntry, check_record, load_record
 from kotlin_qa.semgrep_run import scan_rule
 from kotlin_qa.summary import check_summary, write_summary
 from kotlin_qa.suppression import scope_files, suppression_findings
+from kotlin_qa.toolchain import (
+    PINNED,
+    ChecksumError,
+    ToolMissingError,
+    cache_dir,
+    download,
+)
+from kotlin_qa.toolchain import install as install_tool
 from kotlin_qa.tools import lane_tool
 
 if TYPE_CHECKING:
@@ -76,6 +84,10 @@ def _parser() -> argparse.ArgumentParser:
     summary.add_argument("--check", action="store_true")
 
     commands.add_parser("tools", help="every lane, whether it is on, and its tool")
+    installer = commands.add_parser(
+        "install-tools", help="download the pinned ktlint, ShellCheck, actionlint, zizmor, gitleaks"
+    )
+    installer.add_argument("names", nargs="*", help="tools to install; default all")
     return parser
 
 
@@ -107,6 +119,7 @@ def _dispatch(args: argparse.Namespace, config: Config) -> int:
         "record": lambda: _record(config, args.action),
         "summary": lambda: _summary(config, check=args.check),
         "tools": lambda: _tools(config),
+        "install-tools": lambda: _install_tools(tuple(args.names)),
     }
     return handlers[args.command or "run"]()
 
@@ -248,4 +261,22 @@ def _tools(config: Config) -> int:
         if lane == "summary" and config.summary_file is None:
             state = "off (no summary file)"
         sys.stdout.write(f"{lane:{width}} {state:22} {lane_tool(config, lane)}\n")
+    return 0
+
+
+def _install_tools(names: tuple[str, ...]) -> int:
+    unknown = sorted(set(names) - set(PINNED))
+    if unknown:
+        sys.stderr.write(
+            f"kotlin-qa: unknown tool {unknown[0]}; known: {', '.join(sorted(PINNED))}\n"
+        )
+        return 2
+    cache = cache_dir()
+    for name in names or sorted(PINNED):
+        try:
+            path = install_tool(name, cache, fetch=download)
+        except (ChecksumError, ToolMissingError, OSError) as error:
+            sys.stderr.write(f"kotlin-qa: {error}\n")
+            return 1
+        sys.stdout.write(f"{name} {PINNED[name].version}: {path}\n")
     return 0

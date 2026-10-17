@@ -1,6 +1,6 @@
 [project]
 name = "kotlin-qa-ci"
-version = "0.1.1"
+version = "0.2.0"
 description = "One QA entry point for Kotlin and Android projects, built for the Defence Before Fix method"
 readme = "README.md"
 license = "MIT"
