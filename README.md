@@ -30,7 +30,7 @@ documentation offline, including a "How to fix correctly" section.
 ## Install
 
 ```bash
-pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.0
+pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.1
 kotlin-qa tools                   # every lane and what runs it
 ```
 

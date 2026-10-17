@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- The Semgrep lane no longer scans the rules' own fixtures, whose red lines are meant to fire.
+
 ## 0.1.0
 
 First release.

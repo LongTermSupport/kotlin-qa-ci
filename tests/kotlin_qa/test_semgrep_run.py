@@ -64,6 +64,11 @@ def test_a_project_rule_flags_the_source_it_matches(tmp_path: Path) -> None:
     assert "Run: kotlin-qa rule-doc proj.kt.no-sleep" in found[0].message
 
 
+def test_the_fixtures_of_the_rules_are_proved_not_scanned_as_project_source(tmp_path: Path) -> None:
+    found = scan_project(load_config(project(tmp_path)), [], paths=None)
+    assert [f.path for f in found] == ["app/src/Worker.kt"]
+
+
 def test_a_recorded_exception_covers_the_findings_of_its_rule_in_its_file(tmp_path: Path) -> None:
     config = load_config(project(tmp_path))
     assert project_findings(scan_project(config, [covering()], paths=None)) == []

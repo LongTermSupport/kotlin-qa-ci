@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from kotlin_qa.finding import Finding
 from kotlin_qa.rules import Rule, load_rules
-from kotlin_qa.suppression import project_files, scope_files
+from kotlin_qa.suppression import project_files, scope_files, within
 
 if TYPE_CHECKING:
     from kotlin_qa.config import Config
@@ -83,7 +83,13 @@ def scan_project(
         if paths is None
         else scope_files(root, config.scan_exclude, paths)
     )
-    targets = [name for name in names if name.endswith(_SOURCE_SUFFIXES)]
+    # A rule's fixtures hold lines that are meant to fire; the rules lane proves them instead.
+    targets = [
+        name
+        for name in names
+        if name.endswith(_SOURCE_SUFFIXES)
+        and not any(within(name, directory) for directory in config.rule_dirs)
+    ]
     covered = [e for e in entries if e.covers == "findings"]
     if not targets:
         return _stale(covered, set(), config) if paths is None else []

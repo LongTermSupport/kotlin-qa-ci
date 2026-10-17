@@ -3,7 +3,7 @@
 ## 1. Install and configure
 
 ```bash
-pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.0
+pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.1
 mkdir -p qa/rules qa/defences
 ```
 
