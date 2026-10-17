@@ -1,0 +1,68 @@
+[project]
+name = "kotlin-qa-ci"
+version = "0.1.0"
+description = "One QA entry point for Kotlin and Android projects, built for the Defence Before Fix method"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
+# The detector that hosts the bespoke rules is pinned exactly: a new release can add findings,
+# which must arrive as a deliberate bump of this package rather than as a red run one morning.
+dependencies = [
+    "semgrep==1.181.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff==0.14.0"]
+
+[project.scripts]
+kotlin-qa = "kotlin_qa.cli:main"
+
+[project.urls]
+Repository = "https://github.com/LongTermSupport/kotlin-qa-ci"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kotlin_qa"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "BLE", "PT", "RUF", "C4", "PL"]
+# S603 and S607 flag every subprocess call. This package exists to run Git, Gradle, ktlint and
+# Semgrep with argument lists it builds itself, never through a shell and never from text a
+# project author did not write into its own configuration, so the pair would fire on its whole
+# purpose. PLR2004 and PLR0913 count magic numbers and arguments, which the tables and
+# dataclasses here are plainly made of.
+ignore = ["S603", "S607", "PLR2004", "PLR0913"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607", "PLR0915"]
+
+# Defence Before Fix conformance declaration (https://defence-before-fix.github.io/).
+# docs/CONFORMANCE.md is the evidence.
+[tool.defence-before-fix]
+method = "1.1.0"
+toolchain = "0.2.0"
+detector = "1.0.0"
+known-gaps = []

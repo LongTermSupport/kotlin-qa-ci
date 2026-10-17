@@ -1,0 +1,9 @@
+rules:
+  - id: kqaci.kt.await-no-timeout
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      Tasks.await without a timeout can block a worker for ever. Run: kotlin-qa rule-doc kqaci.kt.await-no-timeout
+    pattern: Tasks.await($TASK)
+    metadata:
+      hazard: A Play-services call that never completes ties up its thread until the operating system stops the process.

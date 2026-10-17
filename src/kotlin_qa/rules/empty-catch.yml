@@ -1,0 +1,13 @@
+rules:
+  - id: kqaci.kt.empty-catch
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      An empty catch block hides the failure it catches. Run: kotlin-qa rule-doc kqaci.kt.empty-catch
+    pattern: |
+      try {
+        ...
+      } catch ($E: $T) {
+      }
+    metadata:
+      hazard: A failure swallowed without a log, a state change or a rethrow leaves the app reporting success for work that did not happen.

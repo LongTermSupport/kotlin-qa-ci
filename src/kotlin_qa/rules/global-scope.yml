@@ -1,0 +1,11 @@
+rules:
+  - id: kqaci.kt.global-scope
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      GlobalScope coroutines outlive everything that started them. Run: kotlin-qa rule-doc kqaci.kt.global-scope
+    pattern-either:
+      - pattern: GlobalScope.launch(...)
+      - pattern: GlobalScope.async(...)
+    metadata:
+      hazard: A coroutine in GlobalScope is never cancelled with its owner, so it leaks work and holds references after the service or screen that started it is gone.

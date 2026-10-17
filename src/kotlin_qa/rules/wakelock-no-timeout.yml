@@ -1,0 +1,9 @@
+rules:
+  - id: kqaci.kt.wakelock-no-timeout
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      WakeLock.acquire() without a timeout keeps the device awake until released. Run: kotlin-qa rule-doc kqaci.kt.wakelock-no-timeout
+    pattern: $LOCK.acquire()
+    metadata:
+      hazard: A wake lock whose release is skipped by an error path keeps the CPU awake and drains the battery until the process dies.
