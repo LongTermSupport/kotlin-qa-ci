@@ -106,7 +106,7 @@ def test_a_real_directive_after_a_string_with_a_comment_marker_is_still_found() 
 
 
 def test_nested_block_comments_and_char_literals_do_not_confuse_the_scan() -> None:
-    source = "/* a /* b */ still comment */\nval c = '\"'\n@Suppress(\"x\")\nfun f() {}\n"
+    source = '/* a /* b */ still comment */\nval c = \'"\'\n@Suppress("x")\nfun f() {}\n'
     assert sites(source) == [(3, "kotlin", ("x",))]
 
 
@@ -137,7 +137,10 @@ def test_a_lint_baseline_file_is_a_suppression_route() -> None:
 
 
 def test_lint_xml_issues_set_to_ignore_are_found() -> None:
-    source = '<lint>\n  <issue id="Foo" severity="ignore"/>\n  <issue id="Bar" severity="error"/>\n</lint>'
+    source = (
+        '<lint>\n  <issue id="Foo" severity="ignore"/>\n'
+        '  <issue id="Bar" severity="error"/>\n</lint>'
+    )
     assert [(s.line, s.codes) for s in xml_sites("lint.xml", source)] == [(2, ("Foo",))]
 
 

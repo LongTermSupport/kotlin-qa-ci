@@ -3,21 +3,41 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-import tomllib
 
 QA_DIR_NAME = "qa"
 CONFIG_FILE = f"{QA_DIR_NAME}/kotlin-qa.toml"
 # Every lane the run knows, in the order it runs them. summary is on, but only does anything when
 # a summary file is named.
-TOOLS = ("fmt", "record", "suppression", "summary", "docs", "rules", "semgrep", "lint", "test", "build")
+TOOLS = (
+    "fmt",
+    "record",
+    "suppression",
+    "summary",
+    "docs",
+    "rules",
+    "semgrep",
+    "lint",
+    "test",
+    "build",
+)
 CHECK_PHASES = ("detectors", "runners")
 
 _TOP_KEYS = frozenset(
-    {"record", "docs_dir", "rule_dirs", "scan_exclude", "tools", "summary", "gradle", "lock", "check"}
+    {
+        "record",
+        "docs_dir",
+        "rule_dirs",
+        "scan_exclude",
+        "tools",
+        "summary",
+        "gradle",
+        "lock",
+        "check",
+    }
 )
 _RECORD_KEYS = frozenset({"path", "max_total", "max_per_rule", "max_review_days"})
 _GRADLE_KEYS = frozenset({"wrapper", "test_task", "lint_task", "build_task"})

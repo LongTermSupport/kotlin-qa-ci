@@ -47,7 +47,14 @@ def test_valid_entry_loads(tmp_path: Path) -> None:
     assert findings == []
     assert entries == [
         RecordEntry(
-            1, "lint::HardcodedText", "app/src/main/kotlin/Run.kt", GOOD, "alice", date(2026, 1, 15), date(2026, 4, 15), 1
+            1,
+            "lint::HardcodedText",
+            "app/src/main/kotlin/Run.kt",
+            GOOD,
+            "alice",
+            date(2026, 1, 15),
+            date(2026, 4, 15),
+            1,
         )
     ]
 

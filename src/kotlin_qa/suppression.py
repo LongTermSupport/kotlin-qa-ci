@@ -10,11 +10,10 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
-
-import tomllib
 
 from kotlin_qa.config import CONFIG_FILE
 from kotlin_qa.finding import Finding

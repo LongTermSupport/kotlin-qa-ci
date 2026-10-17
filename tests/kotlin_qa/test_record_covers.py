@@ -47,7 +47,7 @@ def test_an_exception_may_cover_findings_of_a_semgrep_rule(tmp_path: Path) -> No
 def test_findings_can_be_covered_only_for_semgrep(tmp_path: Path) -> None:
     entries, findings = load(tmp_path, entry("kotlin::unused", covers='"findings"'))
     assert entries == []
-    assert any("covers = \"findings\" is only for semgrep" in line for line in findings)
+    assert any('covers = "findings" is only for semgrep' in line for line in findings)
 
 
 def test_covers_must_be_site_or_findings(tmp_path: Path) -> None:

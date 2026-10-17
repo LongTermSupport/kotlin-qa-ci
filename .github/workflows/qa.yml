@@ -1,0 +1,53 @@
+name: kotlin-qa
+
+# Reusable: call with
+#   uses: LongTermSupport/kotlin-qa-ci/.github/workflows/qa.yml@<tag>
+# The caller's repository is checked out, and `kotlin-qa run --ci` is run in it.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: kotlin-qa-ci version to install
+        type: string
+        required: true
+      ktlint-version:
+        type: string
+        required: true
+      ktlint-sha256:
+        type: string
+        required: true
+      java-version:
+        type: string
+        default: "21"
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: gradle
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install ktlint and kotlin-qa-ci
+        env:
+          KTLINT_VERSION: ${{ inputs.ktlint-version }}
+          KTLINT_SHA256: ${{ inputs.ktlint-sha256 }}
+          KQA_VERSION: ${{ inputs.version }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/ktlint" \
+            "https://github.com/ktlint/ktlint/releases/download/$KTLINT_VERSION/ktlint"
+          echo "$KTLINT_SHA256  $RUNNER_TEMP/ktlint" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/ktlint"
+          echo "KTLINT=$RUNNER_TEMP/ktlint" >> "$GITHUB_ENV"
+          pip install "kotlin-qa-ci==$KQA_VERSION"
+      - name: kotlin-qa run
+        run: kotlin-qa run --ci

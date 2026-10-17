@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
-
-import tomllib
 
 from kotlin_qa.config import RecordPolicy
 from kotlin_qa.finding import Finding

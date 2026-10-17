@@ -9,6 +9,7 @@ never means a lock is held.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import os
 import subprocess
 from typing import TYPE_CHECKING
@@ -50,8 +51,6 @@ def run_lock(path: Path | None) -> Iterator[None]:
     if path is None:
         yield
         return
-    import fcntl  # deferred: POSIX only, and needed only when a lock is taken
-
     path.parent.mkdir(parents=True, exist_ok=True)
     # Opened for append, so a refused run cannot erase the holder's stamp before it reads it.
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o644)

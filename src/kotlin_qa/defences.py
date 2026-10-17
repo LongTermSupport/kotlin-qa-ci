@@ -44,6 +44,10 @@ BUILTIN = {
         "rules",
         "Every custom rule flags its red examples and nothing else in its fixture.",
     ),
+    "kqaci.semgrep.error": (
+        "semgrep",
+        "Semgrep reads every source file completely, so no rule is skipped silently.",
+    ),
     "kqaci.lint": ("lint", "Android Lint reports no issue."),
     "kqaci.tests": ("test", "The unit test suite passes."),
     "kqaci.build": ("build", "The app builds."),

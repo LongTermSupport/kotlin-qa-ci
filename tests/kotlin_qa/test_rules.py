@@ -65,7 +65,7 @@ def test_an_example_for_another_rule_does_not_prove_this_one(tmp_path: Path) -> 
 
 
 def test_a_rule_that_names_no_hazard_is_unnamed(tmp_path: Path) -> None:
-    rule = GOOD_RULE.replace("    metadata:\n      hazard: A sleeping worker holds its thread and its wake lock for nothing.\n", "")
+    rule = GOOD_RULE.split("    metadata:")[0]
     _, findings = project_rules(project(tmp_path, rule))
     assert [r for r, _ in findings] == [UNNAMED]
 
@@ -83,7 +83,9 @@ def test_a_rule_missing_required_keys_is_invalid_and_left_out(tmp_path: Path) ->
 
 
 def test_an_id_that_is_not_dotted_lower_case_is_invalid(tmp_path: Path) -> None:
-    ids, findings = project_rules(project(tmp_path, GOOD_RULE.replace("proj.kt.no-sleep", "NoSleep")))
+    ids, findings = project_rules(
+        project(tmp_path, GOOD_RULE.replace("proj.kt.no-sleep", "NoSleep"))
+    )
     assert ids == []
     assert [rule for rule, _ in findings] == [INVALID]
 

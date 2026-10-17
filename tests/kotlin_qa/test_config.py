@@ -57,7 +57,8 @@ def test_a_project_check_is_read(tmp_path: Path) -> None:
         tmp_path,
         '[[check]]\nname = "shellcheck"\nphase = "detectors"\n'
         'description = "Every shell script passes ShellCheck."\n'
-        'command = ["shellcheck", "{files}"]\nfiles = ["**/*.sh"]\ndoc = "qa/defences/shellcheck.md"\n',
+        'command = ["shellcheck", "{files}"]\nfiles = ["**/*.sh"]\n'
+        'doc = "qa/defences/shellcheck.md"\n',
     )
     (check,) = load_config(tmp_path).checks
     assert check.name == "shellcheck"
@@ -75,11 +76,10 @@ def test_a_project_check_is_read(tmp_path: Path) -> None:
         ("[gradle]\nwrapper = 3\n", "gradle.wrapper must be a string"),
         ("[gradle]\nspeed = 3\n", "unknown key gradle.speed"),
         ("[record]\nmax_total = 0\n", "record.max_total must be a positive integer"),
-        ("rule_dirs = \"qa/rules\"\n", "rule_dirs must be a list of strings"),
+        ('rule_dirs = "qa/rules"\n', "rule_dirs must be a list of strings"),
         ('[[check]]\nname = "x"\n', "check #1: command is missing"),
         (
-            '[[check]]\nname = "Bad Name"\ncommand = ["x"]\ndescription = "d"\n'
-            'doc = "d.md"\n',
+            '[[check]]\nname = "Bad Name"\ncommand = ["x"]\ndescription = "d"\ndoc = "d.md"\n',
             "check #1: name must be lower case",
         ),
         (

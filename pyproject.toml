@@ -58,6 +58,9 @@ ignore = ["S603", "S607", "PLR2004", "PLR0913"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S603", "S607", "PLR0915"]
+# The Kotlin lexer is one state machine over characters; splitting it across functions would
+# scatter its state and make it harder to read, not easier.
+"src/kotlin_qa/suppression.py" = ["PLR0912", "PLR0915"]
 
 # Defence Before Fix conformance declaration (https://defence-before-fix.github.io/).
 # docs/CONFORMANCE.md is the evidence.
