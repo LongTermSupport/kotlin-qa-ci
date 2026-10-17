@@ -48,6 +48,6 @@ jobs:
           echo "$KTLINT_SHA256  $RUNNER_TEMP/ktlint" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/ktlint"
           echo "KTLINT=$RUNNER_TEMP/ktlint" >> "$GITHUB_ENV"
-          pip install "kotlin-qa-ci==$KQA_VERSION"
+          pip install "git+https://github.com/LongTermSupport/kotlin-qa-ci@v$KQA_VERSION"
       - name: kotlin-qa run
         run: kotlin-qa run --ci

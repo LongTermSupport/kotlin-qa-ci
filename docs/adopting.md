@@ -3,7 +3,7 @@
 ## 1. Install and configure
 
 ```bash
-pip install kotlin-qa-ci
+pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v0.1.0
 mkdir -p qa/rules qa/defences
 ```
 
@@ -68,7 +68,7 @@ covers = "findings"
 
 ## 4. CI
 
-Install Python 3.11+, `pip install kotlin-qa-ci==<version>`, install ktlint, set up Java, and run
+Install Python 3.11+, `pip install git+https://github.com/LongTermSupport/kotlin-qa-ci@v<version>`, install ktlint, set up Java, and run
 `kotlin-qa run --ci`. The reusable workflow in `.github/workflows/qa.yml` of this repository does
 exactly that: call it with `uses: LongTermSupport/kotlin-qa-ci/.github/workflows/qa.yml@<tag>`.
 
