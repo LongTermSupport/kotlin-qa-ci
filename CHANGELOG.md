@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The reusable workflow `.github/workflows/qa.yml` installs its tools with `kotlin-qa install-tools`
+  and checks out the whole history, as `docs/adopting.md` describes. It read two inputs it never
+  declared (`ktlint-version`, `ktlint-sha256`), so its ktlint download could not succeed.
+
 ## 0.2.0
 
 New lanes, all blocking, each with a documented identifier:
