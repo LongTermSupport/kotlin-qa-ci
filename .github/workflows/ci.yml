@@ -1,11 +1,27 @@
 name: CI
 
+# A push that changes only documentation starts no run; pull requests are never filtered.
+# src/ stays in whole: the docs lane checks the defence pages bundled under src/kotlin_qa/docs/.
 on:
   push:
+    paths:
+      - "**"
+      - "!**.md"
+      - "!docs/**"
+      - "src/**"
+      - "**/CLAUDE.md"
+      - "**/AGENTS.md"
+      - ".claude/**"
+      - ".github/**"
   pull_request:
 
 permissions:
   contents: read
+
+# A newer push to the same ref supersedes a pull request's run; a run on a branch push finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -23,3 +39,17 @@ jobs:
         run: pytest -q
       - name: The tool's own bundled defences
         run: kotlin-qa run -t rules -t docs
+
+  # The workflow lint (LongTermSupport/actions-qa-ci), on pull requests.
+  actions-qa-ci:
+    name: actions-qa-ci
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: LongTermSupport/actions-qa-ci@2784a484769348f14ed780db9b45cd3a402bf31e # v0.1.0
